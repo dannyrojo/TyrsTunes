@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rodio::{OutputStream, OutputStreamHandle, Sink, Source};
+use rodio::{OutputStream, OutputStreamHandle, Sink};
 use std::io::{BufReader, stdin};
 use std::fs::File;
 use std::sync::{Arc, Mutex};
@@ -9,14 +9,13 @@ use std::collections::VecDeque;
 #[derive(Clone, Debug)]
 struct Track {
     path: String,
-    should_loop: bool,
 }
 
 struct AudioBackend {
     sink: Arc<Mutex<Sink>>,
     playlist: Arc<Mutex<VecDeque<Track>>>,
-    current_track: Arc<Mutex<Option<Track>>>,
-    stream_handle: Arc<OutputStreamHandle>,
+    current_track_index: Arc<Mutex<Option<usize>>>,
+    is_looping: Arc<Mutex<bool>>,
 }
 
 impl AudioBackend {
@@ -27,25 +26,41 @@ impl AudioBackend {
         Ok(AudioBackend {
             sink: Arc::new(Mutex::new(sink)),
             playlist: Arc::new(Mutex::new(VecDeque::new())),
-            current_track: Arc::new(Mutex::new(None)),
-            stream_handle: Arc::new(stream_handle),
+            current_track_index: Arc::new(Mutex::new(None)),
+            is_looping: Arc::new(Mutex::new(false)),
         })
     }
 
     fn add_to_playlist(&self, path: String) -> Result<()> {
-        self.playlist.lock().unwrap().push_back(Track { path, should_loop: false });
+        self.playlist.lock().unwrap().push_back(Track { path });
         self.play_next_if_empty()?;
         Ok(())
     }
 
     fn play_next_if_empty(&self) -> Result<()> {
         if self.sink.lock().unwrap().empty() {
-            if let Some(track) = self.playlist.lock().unwrap().pop_front() {
-                self.play_track(track)?;
-            } else {
-                *self.current_track.lock().unwrap() = None;
-            }
+            self.play_next()?;
         }
+        Ok(())
+    }
+
+    fn play_next(&self) -> Result<()> {
+        let playlist = self.playlist.lock().unwrap();
+        let mut current_track_index = self.current_track_index.lock().unwrap();
+        
+        if playlist.is_empty() {
+            *current_track_index = None;
+            return Ok(());
+        }
+
+        let next_index = current_track_index
+            .map(|i| (i + 1) % playlist.len())
+            .unwrap_or(0);
+
+        let track = playlist[next_index].clone();
+        self.play_track(track)?;
+        *current_track_index = Some(next_index);
+        
         Ok(())
     }
 
@@ -56,26 +71,17 @@ impl AudioBackend {
             .context("Failed to decode audio file")?;
         
         let sink = self.sink.lock().unwrap();
-        if track.should_loop {
-            sink.append(source.repeat_infinite());
-        } else {
-            sink.append(source);
-        }
-        sink.set_volume(1.0); // Reset volume to default
+        sink.append(source);
         
-        *self.current_track.lock().unwrap() = Some(track);
+        
         Ok(())
     }
 
     fn play_or_resume(&self) -> Result<()> {
-        if let Some(track) = self.current_track.lock().unwrap().as_ref() {
-            if self.sink.lock().unwrap().is_paused() {
-                self.sink.lock().unwrap().play();
-            } else if self.sink.lock().unwrap().empty() {
-                self.play_track(track.clone())?;
-            }
-        } else {
-            self.play_next_if_empty()?;
+        if self.sink.lock().unwrap().is_paused() {
+            self.sink.lock().unwrap().play();
+        } else if self.sink.lock().unwrap().empty() {
+            self.play_next()?;
         }
         Ok(())
     }
@@ -93,35 +99,33 @@ impl AudioBackend {
     }
 
     fn toggle_loop(&self) -> Result<()> {
-        if let Some(track) = self.current_track.lock().unwrap().as_mut() {
-            track.should_loop = !track.should_loop;
-            
-            // Stop the current playback
-            self.sink.lock().unwrap().stop();
-            
-            // Replay the track with the new loop setting
-            self.play_track(track.clone())?;
-            
-            if track.should_loop {
-                println!("Looping enabled for the current track.");
-            } else {
-                println!("Looping disabled for the current track.");
+        let mut is_looping = self.is_looping.lock().unwrap();
+        *is_looping = !*is_looping;
+        
+        if *is_looping {
+            println!("Looping enabled for the current track.");
+        } else {
+            println!("Looping disabled for the current track.");
+        }
+        Ok(())
+    }
+
+    fn handle_track_end(&self) -> Result<()> {
+        if *self.is_looping.lock().unwrap() {
+            if let Some(index) = *self.current_track_index.lock().unwrap() {
+                let track = self.playlist.lock().unwrap()[index].clone();
+                self.play_track(track)?;
             }
         } else {
-            println!("No track is currently playing.");
+            self.play_next()?;
         }
         Ok(())
     }
 
     fn skip(&self) -> Result<()> {
         self.sink.lock().unwrap().stop();
-        self.play_next_if_empty()?;
+        self.play_next()?;
         Ok(())
-    }
-
-    // Add a new method to clear the current track
-    fn clear_current_track(&self) {
-        *self.current_track.lock().unwrap() = None;
     }
 }
 
@@ -188,9 +192,8 @@ fn main() -> Result<()> {
 
     loop {
         if audio_backend.is_empty() {
-            audio_backend.clear_current_track();
-            if let Err(e) = audio_backend.play_next_if_empty() {
-                eprintln!("Error playing next track: {}", e);
+            if let Err(e) = audio_backend.handle_track_end() {
+                eprintln!("Error handling track end: {}", e);
             }
             thread::sleep(std::time::Duration::from_millis(100));
         } else {
