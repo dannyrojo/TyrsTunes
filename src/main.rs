@@ -1,42 +1,87 @@
 use anyhow::{Context, Result};
-use rodio::{OutputStream, OutputStreamHandle, Source, Sink};
-use std::io::{self, BufReader, stdin};
+use rodio::{OutputStream, OutputStreamHandle, Sink, Source};
+use std::io::{BufReader, stdin};
 use std::fs::File;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::collections::VecDeque;
+
+#[derive(Clone, Debug)]
+struct Track {
+    path: String,
+    should_loop: bool,
+}
 
 struct AudioBackend {
     sink: Arc<Mutex<Sink>>,
+    playlist: Arc<Mutex<VecDeque<Track>>>,
+    current_track: Arc<Mutex<Option<Track>>>,
+    stream_handle: Arc<OutputStreamHandle>,
 }
 
 impl AudioBackend {
-    fn new(stream_handle: &OutputStreamHandle) -> Result<Self> {
-        let sink = Sink::try_new(stream_handle)
+    fn new(stream_handle: OutputStreamHandle) -> Result<Self> {
+        let sink = Sink::try_new(&stream_handle)
             .context("Failed to create audio sink")?;
         
         Ok(AudioBackend {
             sink: Arc::new(Mutex::new(sink)),
+            playlist: Arc::new(Mutex::new(VecDeque::new())),
+            current_track: Arc::new(Mutex::new(None)),
+            stream_handle: Arc::new(stream_handle),
         })
     }
 
-    fn play_sound(&self, path: &str, should_loop: bool) -> Result<()> {
-        let file = File::open(path)
-            .context(format!("Failed to open file: {}", path))?;
+    fn add_to_playlist(&self, path: String) -> Result<()> {
+        self.playlist.lock().unwrap().push_back(Track { path, should_loop: false });
+        self.play_next_if_empty()?;
+        Ok(())
+    }
+
+    fn play_next_if_empty(&self) -> Result<()> {
+        if self.sink.lock().unwrap().empty() {
+            if let Some(track) = self.playlist.lock().unwrap().pop_front() {
+                self.play_track(track)?;
+            } else {
+                *self.current_track.lock().unwrap() = None;
+            }
+        }
+        Ok(())
+    }
+
+    fn play_track(&self, track: Track) -> Result<()> {
+        let file = File::open(&track.path)
+            .context(format!("Failed to open file: {}", track.path))?;
         let source = rodio::Decoder::new(BufReader::new(file))
             .context("Failed to decode audio file")?;
         
-        let source: Box<dyn Source<Item = i16> + Send> = if should_loop {
-            Box::new(source.repeat_infinite())
+        let sink = self.sink.lock().unwrap();
+        if track.should_loop {
+            sink.append(source.repeat_infinite());
         } else {
-            Box::new(source)
-        };
+            sink.append(source);
+        }
+        sink.set_volume(1.0); // Reset volume to default
+        
+        *self.current_track.lock().unwrap() = Some(track);
+        Ok(())
+    }
 
-        self.sink.lock().unwrap().append(source);
+    fn play_or_resume(&self) -> Result<()> {
+        if let Some(track) = self.current_track.lock().unwrap().as_ref() {
+            if self.sink.lock().unwrap().is_paused() {
+                self.sink.lock().unwrap().play();
+            } else if self.sink.lock().unwrap().empty() {
+                self.play_track(track.clone())?;
+            }
+        } else {
+            self.play_next_if_empty()?;
+        }
         Ok(())
     }
 
     fn stop(&self) {
-        self.sink.lock().unwrap().stop();
+        self.sink.lock().unwrap().pause();
     }
 
     fn set_volume(&self, volume: f32) {
@@ -46,33 +91,57 @@ impl AudioBackend {
     fn is_empty(&self) -> bool {
         self.sink.lock().unwrap().empty()
     }
+
+    fn toggle_loop(&self) -> Result<()> {
+        if let Some(track) = self.current_track.lock().unwrap().as_mut() {
+            track.should_loop = !track.should_loop;
+            
+            // Stop the current playback
+            self.sink.lock().unwrap().stop();
+            
+            // Replay the track with the new loop setting
+            self.play_track(track.clone())?;
+            
+            if track.should_loop {
+                println!("Looping enabled for the current track.");
+            } else {
+                println!("Looping disabled for the current track.");
+            }
+        } else {
+            println!("No track is currently playing.");
+        }
+        Ok(())
+    }
+
+    fn skip(&self) -> Result<()> {
+        self.sink.lock().unwrap().stop();
+        self.play_next_if_empty()?;
+        Ok(())
+    }
+
+    // Add a new method to clear the current track
+    fn clear_current_track(&self) {
+        *self.current_track.lock().unwrap() = None;
+    }
 }
 
 fn main() -> Result<()> {
-    let (stream, stream_handle) = OutputStream::try_default()
+    let (_stream, stream_handle) = OutputStream::try_default()
         .context("Failed to create audio output stream")?;
-    let audio_backend = Arc::new(AudioBackend::new(&stream_handle)?);
+    let audio_backend = Arc::new(AudioBackend::new(stream_handle)?);
     let audio_backend_clone = Arc::clone(&audio_backend);
 
-    // Keep the stream alive
-    std::mem::forget(stream);
-
-    // Start a separate thread for user input
-    thread::spawn(move || {
+    let _input_thread = thread::spawn(move || {
         loop {
-            println!("Enter a command (play, stop, volume, loop, quit):");
+            println!("Enter a command (play, stop, volume, loop, skip, add, quit):");
             let mut input = String::new();
             stdin().read_line(&mut input).expect("Failed to read line");
             let command = input.trim();
 
             match command {
                 "play" => {
-                    println!("Enter the path to the audio file:");
-                    let mut path = String::new();
-                    stdin().read_line(&mut path).expect("Failed to read line");
-                    let path = path.trim();
-                    if let Err(e) = audio_backend_clone.play_sound(path, false) {
-                        eprintln!("Error playing sound: {}", e);
+                    if let Err(e) = audio_backend_clone.play_or_resume() {
+                        eprintln!("Error playing or resuming track: {}", e);
                     }
                 },
                 "stop" => audio_backend_clone.stop(),
@@ -87,23 +156,42 @@ fn main() -> Result<()> {
                     }
                 },
                 "loop" => {
-                    println!("Enter the path to the audio file to loop:");
-                    let mut path = String::new();
-                    stdin().read_line(&mut path).expect("Failed to read line");
-                    let path = path.trim();
-                    if let Err(e) = audio_backend_clone.play_sound(path, true) {
-                        eprintln!("Error playing looped sound: {}", e);
+                    if let Err(e) = audio_backend_clone.toggle_loop() {
+                        eprintln!("Error toggling loop: {}", e);
                     }
                 },
-                "quit" => break,
+                "skip" => {
+                    let audio_backend = Arc::clone(&audio_backend_clone);
+                    thread::spawn(move || {
+                        if let Err(e) = audio_backend.skip() {
+                            eprintln!("Error skipping track: {}", e);
+                        }
+                    });
+                },
+                "add" => {
+                    println!("Enter the path to the audio file:");
+                    let mut path = String::new();
+                    stdin().read_line(&mut path).expect("Failed to read line");
+                    let path = path.trim().to_string();
+                    if let Err(e) = audio_backend_clone.add_to_playlist(path) {
+                        eprintln!("Error adding to playlist: {}", e);
+                    }
+                },
+                "quit" => {
+                    println!("Exiting...");
+                    std::process::exit(0);
+                },
                 _ => println!("Unknown command"),
             }
         }
     });
 
-    // Keep the main thread running
     loop {
         if audio_backend.is_empty() {
+            audio_backend.clear_current_track();
+            if let Err(e) = audio_backend.play_next_if_empty() {
+                eprintln!("Error playing next track: {}", e);
+            }
             thread::sleep(std::time::Duration::from_millis(100));
         } else {
             thread::sleep(std::time::Duration::from_millis(1000));
