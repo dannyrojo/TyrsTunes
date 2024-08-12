@@ -6,13 +6,13 @@ use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
 
 #[derive(Clone, Debug)]
-struct Track {
-    path: String,
+struct AudioTrack {
+    file_path: String,
 }
 
 struct AudioBackend {
     sink: Arc<Mutex<Sink>>,
-    playlist: Arc<Mutex<VecDeque<Track>>>,
+    playlist: Arc<Mutex<VecDeque<AudioTrack>>>,
     current_track_index: Arc<Mutex<Option<usize>>>,
     is_looping: Arc<Mutex<bool>>,
 }
@@ -30,8 +30,8 @@ impl AudioBackend {
         })
     }
 
-    fn add_to_playlist(&self, path: String) -> Result<()> {
-        self.playlist.lock().unwrap().push_back(Track { path });
+    fn add_to_playlist(&self, track: AudioTrack) -> Result<()> {
+        self.playlist.lock().unwrap().push_back(track);
         self.play_next_if_empty()?;
         Ok(())
     }
@@ -57,15 +57,15 @@ impl AudioBackend {
             .unwrap_or(0);
 
         let track = playlist[next_index].clone();
-        self.play_track(track)?;
+        self.play_track(&track)?;
         *current_track_index = Some(next_index);
         
         Ok(())
     }
 
-    fn play_track(&self, track: Track) -> Result<()> {
-        let file = File::open(&track.path)
-            .context(format!("Failed to open file: {}", track.path))?;
+    fn play_track(&self, track: &AudioTrack) -> Result<()> {
+        let file = File::open(&track.file_path)
+            .context(format!("Failed to open file: {}", track.file_path))?;
         let source = rodio::Decoder::new(BufReader::new(file))
             .context("Failed to decode audio file")?;
         
@@ -113,7 +113,7 @@ impl AudioBackend {
         if *self.is_looping.lock().unwrap() {
             if let Some(index) = *self.current_track_index.lock().unwrap() {
                 let track = self.playlist.lock().unwrap()[index].clone();
-                self.play_track(track)?;
+                self.play_track(&track)?;
             }
         } else {
             self.play_next()?;
@@ -184,9 +184,9 @@ impl AudioPlayer {
         backend.skip()
     }
 
-    pub fn add_to_playlist(&self, playlist: usize, path: String) -> Result<()> {
+    pub fn add_to_playlist(&self, playlist: usize, track: AudioTrack) -> Result<()> {
         let backend = self.get_backend(playlist);
-        backend.add_to_playlist(path)
+        backend.add_to_playlist(track)
     }
 
     pub fn get_volume(&self, playlist: usize) -> f32 {

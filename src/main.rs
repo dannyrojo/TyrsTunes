@@ -1,5 +1,6 @@
 mod audio_backend;
 mod gui;
+mod database;
 
 use anyhow::Result;
 use gui::MyApp;
@@ -7,7 +8,7 @@ use gui::MyApp;
 fn main() -> Result<()> {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        "My Audio Player",
+        "TyrsTunes",
         options,
         Box::new(|cc| {
             let app = MyApp::new(cc).expect("Failed to create MyApp");
