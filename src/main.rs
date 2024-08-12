@@ -129,45 +129,74 @@ impl AudioBackend {
     }
 }
 
+struct DualAudioBackend {
+    track1: Arc<AudioBackend>,
+    track2: Arc<AudioBackend>,
+}
+
+impl DualAudioBackend {
+    fn new(stream_handle: OutputStreamHandle) -> Result<Self> {
+        Ok(DualAudioBackend {
+            track1: Arc::new(AudioBackend::new(stream_handle.clone())?),
+            track2: Arc::new(AudioBackend::new(stream_handle)?),
+        })
+    }
+}
+
 fn main() -> Result<()> {
     let (_stream, stream_handle) = OutputStream::try_default()
         .context("Failed to create audio output stream")?;
-    let audio_backend = Arc::new(AudioBackend::new(stream_handle)?);
-    let audio_backend_clone = Arc::clone(&audio_backend);
+    let dual_audio_backend = Arc::new(DualAudioBackend::new(stream_handle)?);
+    let dual_audio_backend_clone = Arc::clone(&dual_audio_backend);
 
     let _input_thread = thread::spawn(move || {
         loop {
-            println!("Enter a command (play, stop, volume, loop, skip, add, quit):");
+            println!("Enter a command (track1/track2 play/stop/volume/loop/skip/add, quit):");
             let mut input = String::new();
             stdin().read_line(&mut input).expect("Failed to read line");
             let command = input.trim();
 
-            match command {
+            let parts: Vec<&str> = command.split_whitespace().collect();
+            if parts.len() < 2 {
+                println!("Invalid command format. Use 'track1' or 'track2' followed by the command.");
+                continue;
+            }
+
+            let track = match parts[0] {
+                "track1" => &dual_audio_backend_clone.track1,
+                "track2" => &dual_audio_backend_clone.track2,
+                _ => {
+                    println!("Invalid track selection. Use 'track1' or 'track2'.");
+                    continue;
+                }
+            };
+
+            match parts[1] {
                 "play" => {
-                    if let Err(e) = audio_backend_clone.play_or_resume() {
+                    if let Err(e) = track.play_or_resume() {
                         eprintln!("Error playing or resuming track: {}", e);
                     }
                 },
-                "stop" => audio_backend_clone.stop(),
+                "stop" => track.stop(),
                 "volume" => {
                     println!("Enter new volume (0.0 - 1.0):");
                     let mut volume = String::new();
                     stdin().read_line(&mut volume).expect("Failed to read line");
                     if let Ok(v) = volume.trim().parse::<f32>() {
-                        audio_backend_clone.set_volume(v);
+                        track.set_volume(v);
                     } else {
                         println!("Invalid volume input");
                     }
                 },
                 "loop" => {
-                    if let Err(e) = audio_backend_clone.toggle_loop() {
+                    if let Err(e) = track.toggle_loop() {
                         eprintln!("Error toggling loop: {}", e);
                     }
                 },
                 "skip" => {
-                    let audio_backend = Arc::clone(&audio_backend_clone);
+                    let track_clone = Arc::clone(track);
                     thread::spawn(move || {
-                        if let Err(e) = audio_backend.skip() {
+                        if let Err(e) = track_clone.skip() {
                             eprintln!("Error skipping track: {}", e);
                         }
                     });
@@ -177,7 +206,7 @@ fn main() -> Result<()> {
                     let mut path = String::new();
                     stdin().read_line(&mut path).expect("Failed to read line");
                     let path = path.trim().to_string();
-                    if let Err(e) = audio_backend_clone.add_to_playlist(path) {
+                    if let Err(e) = track.add_to_playlist(path) {
                         eprintln!("Error adding to playlist: {}", e);
                     }
                 },
@@ -191,13 +220,16 @@ fn main() -> Result<()> {
     });
 
     loop {
-        if audio_backend.is_empty() {
-            if let Err(e) = audio_backend.handle_track_end() {
-                eprintln!("Error handling track end: {}", e);
+        if dual_audio_backend.track1.is_empty() {
+            if let Err(e) = dual_audio_backend.track1.handle_track_end() {
+                eprintln!("Error handling track1 end: {}", e);
             }
-            thread::sleep(std::time::Duration::from_millis(100));
-        } else {
-            thread::sleep(std::time::Duration::from_millis(1000));
         }
+        if dual_audio_backend.track2.is_empty() {
+            if let Err(e) = dual_audio_backend.track2.handle_track_end() {
+                eprintln!("Error handling track2 end: {}", e);
+            }
+        }
+        thread::sleep(std::time::Duration::from_millis(100));
     }
 }
