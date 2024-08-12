@@ -77,35 +77,39 @@ impl AudioBackend {
         Ok(())
     }
 
-    fn play_or_resume(&self) -> Result<()> {
+    fn play_or_resume(&self, track_name: &str) -> Result<()> {
         if self.sink.lock().unwrap().is_paused() {
             self.sink.lock().unwrap().play();
+            println!("Resumed playback on {}", track_name);
         } else if self.sink.lock().unwrap().empty() {
-            self.play_next()?;
+            self.play_next().context(format!("Failed to play next track on {}", track_name))?;
+            println!("Started playback on {}", track_name);
         }
         Ok(())
     }
 
-    fn stop(&self) {
+    fn stop(&self, track_name: &str) {
         self.sink.lock().unwrap().pause();
+        println!("Stopped playback on {}", track_name);
     }
 
-    fn set_volume(&self, volume: f32) {
+    fn set_volume(&self, volume: f32, track_name: &str) {
         self.sink.lock().unwrap().set_volume(volume);
+        println!("Set volume to {} on {}", volume, track_name);
     }
 
     fn is_empty(&self) -> bool {
         self.sink.lock().unwrap().empty()
     }
 
-    fn toggle_loop(&self) -> Result<()> {
+    fn toggle_loop(&self, track_name: &str) -> Result<()> {
         let mut is_looping = self.is_looping.lock().unwrap();
         *is_looping = !*is_looping;
         
         if *is_looping {
-            println!("Looping enabled for the current track.");
+            println!("Looping enabled for the current track on {}", track_name);
         } else {
-            println!("Looping disabled for the current track.");
+            println!("Looping disabled for the current track on {}", track_name);
         }
         Ok(())
     }
@@ -122,23 +126,24 @@ impl AudioBackend {
         Ok(())
     }
 
-    fn skip(&self) -> Result<()> {
+    fn skip(&self, track_name: &str) -> Result<()> {
         self.sink.lock().unwrap().stop();
-        self.play_next()?;
+        self.play_next().context(format!("Failed to skip to next track on {}", track_name))?;
+        println!("Skipped to next track on {}", track_name);
         Ok(())
     }
 }
 
 struct DualAudioBackend {
-    track1: Arc<AudioBackend>,
-    track2: Arc<AudioBackend>,
+    playlist1: Arc<AudioBackend>,
+    playlist2: Arc<AudioBackend>,
 }
 
 impl DualAudioBackend {
     fn new(stream_handle: OutputStreamHandle) -> Result<Self> {
         Ok(DualAudioBackend {
-            track1: Arc::new(AudioBackend::new(stream_handle.clone())?),
-            track2: Arc::new(AudioBackend::new(stream_handle)?),
+            playlist1: Arc::new(AudioBackend::new(stream_handle.clone())?),
+            playlist2: Arc::new(AudioBackend::new(stream_handle)?),
         })
     }
 }
@@ -151,53 +156,53 @@ fn main() -> Result<()> {
 
     let _input_thread = thread::spawn(move || {
         loop {
-            println!("Enter a command (track1/track2 play/stop/volume/loop/skip/add, quit):");
+            println!("Enter a command (playlist1/playlist2 play/stop/volume/loop/skip/add, quit):");
             let mut input = String::new();
             stdin().read_line(&mut input).expect("Failed to read line");
             let command = input.trim();
 
             let parts: Vec<&str> = command.split_whitespace().collect();
             if parts.len() < 2 {
-                println!("Invalid command format. Use 'track1' or 'track2' followed by the command.");
+                println!("Invalid command format. Use 'playlist1' or 'playlist2' followed by the command.");
                 continue;
             }
 
-            let track = match parts[0] {
-                "track1" => &dual_audio_backend_clone.track1,
-                "track2" => &dual_audio_backend_clone.track2,
+            let (playlist, playlist_name) = match parts[0] {
+                "playlist1" => (&dual_audio_backend_clone.playlist1, "playlist1"),
+                "playlist2" => (&dual_audio_backend_clone.playlist2, "playlist2"),
                 _ => {
-                    println!("Invalid track selection. Use 'track1' or 'track2'.");
+                    println!("Invalid playlist selection. Use 'playlist1' or 'playlist2'.");
                     continue;
                 }
             };
 
             match parts[1] {
                 "play" => {
-                    if let Err(e) = track.play_or_resume() {
-                        eprintln!("Error playing or resuming track: {}", e);
+                    if let Err(e) = playlist.play_or_resume(playlist_name) {
+                        eprintln!("Error playing or resuming {}: {}", playlist_name, e);
                     }
                 },
-                "stop" => track.stop(),
+                "stop" => playlist.stop(playlist_name),
                 "volume" => {
                     println!("Enter new volume (0.0 - 1.0):");
                     let mut volume = String::new();
                     stdin().read_line(&mut volume).expect("Failed to read line");
-                    if let Ok(v) = volume.trim().parse::<f32>() {
-                        track.set_volume(v);
-                    } else {
-                        println!("Invalid volume input");
+                    match volume.trim().parse::<f32>() {
+                        Ok(v) if v >= 0.0 && v <= 1.0 => playlist.set_volume(v, playlist_name),
+                        _ => println!("Invalid volume input. Please enter a number between 0.0 and 1.0."),
                     }
                 },
                 "loop" => {
-                    if let Err(e) = track.toggle_loop() {
-                        eprintln!("Error toggling loop: {}", e);
+                    if let Err(e) = playlist.toggle_loop(playlist_name) {
+                        eprintln!("Error toggling loop on {}: {}", playlist_name, e);
                     }
                 },
                 "skip" => {
-                    let track_clone = Arc::clone(track);
+                    let playlist_clone = Arc::clone(playlist);
+                    let playlist_name = playlist_name.to_string();
                     thread::spawn(move || {
-                        if let Err(e) = track_clone.skip() {
-                            eprintln!("Error skipping track: {}", e);
+                        if let Err(e) = playlist_clone.skip(&playlist_name) {
+                            eprintln!("Error skipping track on {}: {}", playlist_name, e);
                         }
                     });
                 },
@@ -206,8 +211,10 @@ fn main() -> Result<()> {
                     let mut path = String::new();
                     stdin().read_line(&mut path).expect("Failed to read line");
                     let path = path.trim().to_string();
-                    if let Err(e) = track.add_to_playlist(path) {
-                        eprintln!("Error adding to playlist: {}", e);
+                    if let Err(e) = playlist.add_to_playlist(path) {
+                        eprintln!("Error adding to {}: {}", playlist_name, e);
+                    } else {
+                        println!("Added track to {}", playlist_name);
                     }
                 },
                 "quit" => {
@@ -220,14 +227,14 @@ fn main() -> Result<()> {
     });
 
     loop {
-        if dual_audio_backend.track1.is_empty() {
-            if let Err(e) = dual_audio_backend.track1.handle_track_end() {
-                eprintln!("Error handling track1 end: {}", e);
+        if dual_audio_backend.playlist1.is_empty() {
+            if let Err(e) = dual_audio_backend.playlist1.handle_track_end() {
+                eprintln!("Error handling playlist1 end: {}", e);
             }
         }
-        if dual_audio_backend.track2.is_empty() {
-            if let Err(e) = dual_audio_backend.track2.handle_track_end() {
-                eprintln!("Error handling track2 end: {}", e);
+        if dual_audio_backend.playlist2.is_empty() {
+            if let Err(e) = dual_audio_backend.playlist2.handle_track_end() {
+                eprintln!("Error handling playlist2 end: {}", e);
             }
         }
         thread::sleep(std::time::Duration::from_millis(100));
