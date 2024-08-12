@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::audio_backend::AudioPlayer;
+use crate::audio_backend::{AudioPlayer, AudioTrack};
 use crate::database::{Database, Track, extract_metadata};
 use anyhow::Result;
 use walkdir::WalkDir;
@@ -11,6 +11,7 @@ pub struct MyApp {
     staged_tracks: Vec<Track>,
     playlist: Vec<Track>,
     current_track_index: Option<usize>,
+    selected_track_index: Option<usize>,
 }
 
 impl MyApp {
@@ -21,6 +22,7 @@ impl MyApp {
             staged_tracks: Vec::new(),
             playlist: Vec::new(),
             current_track_index: None,
+            selected_track_index: None,
         })
     }
 
@@ -83,7 +85,10 @@ impl eframe::App for MyApp {
                                 if ui.button("-").clicked() {
                                     tracks_to_remove.push(index);
                                 }
-                                ui.label(&track.title);
+                                let is_selected = Some(index) == self.selected_track_index;
+                                if ui.selectable_label(is_selected, &track.title).clicked() {
+                                    self.selected_track_index = Some(index);
+                                }
                             });
                         });
                     }
@@ -101,8 +106,10 @@ impl eframe::App for MyApp {
                 if ui.button(if self.audio_player.is_playing(1) { "⏸ Pause" } else { "▶ Play" }).clicked() {
                     if self.audio_player.is_playing(1) {
                         self.audio_player.stop(1);
-                    } else if let Err(e) = self.audio_player.play_or_resume(1) {
-                        eprintln!("Error playing/resuming: {}", e);
+                    } else if let Some(index) = self.selected_track_index {
+                        if let Err(e) = self.play_track(index) {
+                            eprintln!("Error playing track: {}", e);
+                        }
                     }
                 }
 
@@ -129,5 +136,19 @@ impl eframe::App for MyApp {
 
         // Request continuous redraw
         ctx.request_repaint();
+    }
+}
+
+impl MyApp {
+    fn play_track(&mut self, index: usize) -> Result<()> {
+        if let Some(track) = self.playlist.get(index) {
+            let audio_track = AudioTrack {
+                file_path: track.file_path.clone(),
+            };
+            self.audio_player.add_to_playlist(1, audio_track)?;
+            self.audio_player.play_or_resume(1)?;
+            self.current_track_index = Some(index);
+        }
+        Ok(())
     }
 }

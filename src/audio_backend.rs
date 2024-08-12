@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
 
 #[derive(Clone, Debug)]
-struct AudioTrack {
-    file_path: String,
+pub struct AudioTrack {
+    pub file_path: String,
 }
 
 struct AudioBackend {
