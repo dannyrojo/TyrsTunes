@@ -4,14 +4,14 @@ use anyhow::Result;
 
 pub struct MyApp {
     audio_player: AudioPlayer,
-    // Add other UI state here
+    new_track_input: String,
 }
 
 impl MyApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Result<Self> {
         Ok(Self {
             audio_player: AudioPlayer::new()?,
-            // Initialize other UI state
+            new_track_input: String::new(),
         })
     }
 }
@@ -21,47 +21,63 @@ impl eframe::App for MyApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Audio Player Controls");
 
-            // Play/Resume and Stop buttons
             ui.horizontal(|ui| {
-                if ui.button("Play/Resume Playlist 1").clicked() {
-                    if let Err(e) = self.audio_player.play_or_resume(1) {
+                // Play/Pause button
+                if ui.button(if self.audio_player.is_playing(1) { "⏸ Pause" } else { "▶ Play" }).clicked() {
+                    if self.audio_player.is_playing(1) {
+                        self.audio_player.stop(1);
+                    } else if let Err(e) = self.audio_player.play_or_resume(1) {
                         eprintln!("Error playing/resuming playlist 1: {}", e);
                     }
                 }
-                if ui.button("Stop Playlist 1").clicked() {
+
+                // Stop button
+                if ui.button("⏹ Stop").clicked() {
                     self.audio_player.stop(1);
+                }
+
+                // Skip button
+                if ui.button("⏭ Skip").clicked() {
+                    if let Err(e) = self.audio_player.skip(1) {
+                        eprintln!("Error skipping track: {}", e);
+                    }
+                }
+
+                // Loop button
+                let loop_button = egui::Button::new("🔁 Loop")
+                    .fill(if self.audio_player.is_looping(1) {
+                        egui::Color32::from_rgb(0, 125, 255) // Bright blue when active
+                    } else {
+                        ui.visuals().widgets.inactive.bg_fill
+                    });
+                
+                if ui.add(loop_button).clicked() {
+                    if let Err(e) = self.audio_player.toggle_loop(1) {
+                        eprintln!("Error toggling loop: {}", e);
+                    }
                 }
             });
 
             // Volume slider
             let mut volume = self.audio_player.get_volume(1);
             ui.add(egui::Slider::new(&mut volume, 0.0..=1.0).text("Volume"));
-            if ui.button("Set Volume").clicked() {
-                self.audio_player.set_volume(1, volume);
-            }
-
-            // Toggle loop button
-            if ui.button("Toggle Loop").clicked() {
-                if let Err(e) = self.audio_player.toggle_loop(1) {
-                    eprintln!("Error toggling loop: {}", e);
-                }
-            }
-
-            // Skip button
-            if ui.button("Skip").clicked() {
-                if let Err(e) = self.audio_player.skip(1) {
-                    eprintln!("Error skipping track: {}", e);
-                }
-            }
+            self.audio_player.set_volume(1, volume);
 
             // Add to playlist
             ui.horizontal(|ui| {
-                let mut new_track = String::new();
-                ui.text_edit_singleline(&mut new_track);
-                if ui.button("Add to Playlist").clicked() {
-                    if let Err(e) = self.audio_player.add_to_playlist(1, new_track.clone()) {
+                ui.label("Add track:");
+                let response = ui.text_edit_singleline(&mut self.new_track_input);
+                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    if let Err(e) = self.audio_player.add_to_playlist(1, self.new_track_input.clone()) {
                         eprintln!("Error adding track to playlist: {}", e);
                     }
+                    self.new_track_input.clear();
+                }
+                if ui.button("Add").clicked() {
+                    if let Err(e) = self.audio_player.add_to_playlist(1, self.new_track_input.clone()) {
+                        eprintln!("Error adding track to playlist: {}", e);
+                    }
+                    self.new_track_input.clear();
                 }
             });
         });

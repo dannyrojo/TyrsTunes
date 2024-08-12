@@ -194,6 +194,16 @@ impl AudioPlayer {
         backend.sink.lock().unwrap().volume()
     }
 
+    pub fn is_playing(&self, playlist: usize) -> bool {
+        let backend = self.get_backend(playlist);
+        !backend.sink.lock().unwrap().is_paused() && !backend.is_empty()
+    }
+
+    pub fn is_looping(&self, playlist: usize) -> bool {
+        let backend = self.get_backend(playlist);
+        *backend.is_looping.lock().unwrap()
+    }
+
     fn get_backend(&self, playlist: usize) -> &AudioBackend {
         match playlist {
             1 => &self.dual_audio_backend.track1,
