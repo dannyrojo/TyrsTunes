@@ -1,14 +1,27 @@
 use id3::{Tag, TagLike};
 use walkdir::WalkDir;
+use std::path::{Path, PathBuf};
 
 pub struct Track {
     pub title: String,
     pub artist: String,
     pub comments_vec: Vec<String>,
+    path: PathBuf,
+}
+
+impl Track {
+    pub fn new(title: String, artist: String, comments_vec: Vec<String>, path: PathBuf) -> Self {
+        Self { title, artist, comments_vec, path }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 pub fn import_track(track_path: &str) -> Track {
-    let tag = Tag::read_from_path(track_path).unwrap(); 
+    let path = PathBuf::from(track_path);
+    let tag = Tag::read_from_path(&path).unwrap(); 
     let title = tag.title().unwrap_or_default().to_string();
     let artist = tag.artist().unwrap_or_default().to_string();
     let comment_frame = tag.comments();
@@ -16,14 +29,10 @@ pub fn import_track(track_path: &str) -> Track {
         .flat_map(|comment| comment.text.split(','))
         .map(|s| s.trim().to_string())
         .collect();
-    Track {
-        title,
-        artist,
-        comments_vec,
-    }
+    Track::new(title, artist, comments_vec, path)
 }
 
-fn import_directory(dir_path: &str) -> Vec<Track> {
+pub fn import_directory(dir_path: &str) -> Vec<Track> {
     let mut tracks = vec![];
     for entry in WalkDir::new(dir_path) {
         let entry = entry.unwrap();
@@ -45,6 +54,7 @@ mod tests {
         assert_eq!(track.title, "Divine1");
         assert_eq!(track.artist, "Gar");
         assert_eq!(track.comments_vec, vec!["Moody", "Atmospheric"]);
+        assert_eq!(track.path(), Path::new("/home/eggbert/songs/Divine1.mp3"));
     }
     #[test]
     fn test_import_directory() {
