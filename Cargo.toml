@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-eframe = {version ="0.28.1", features = ["persistence"]}
+eframe = "0.28.1"
 id3 = "1.14.0"
 rfd = "0.14.1"
 rusqlite = "0.32.1"
