@@ -3,8 +3,3 @@ name = "TyrsTunes"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-id3 = "1.14.0"
-itertools = "0.13.0"
-rfd = "0.14.1"
-walkdir = "2.5.0"
