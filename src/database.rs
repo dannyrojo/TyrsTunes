@@ -1,6 +1,7 @@
 use rusqlite::Connection;
 use anyhow::{Result, Context};
 use crate::track;
+use crate::utils::{ToStringPath, ToPathBuf};
 
 pub fn initialize_database(db_name: &str) -> Result<()> {
     let conn = Connection::open(db_name)
@@ -23,7 +24,12 @@ pub fn add_track(db_name: &str, track: &track::Track) -> Result<()> {
         .context("Failed to open database connection")?;
     conn.execute(
         "INSERT INTO tracks (title, artist, tags, path) VALUES (?1, ?2, ?3, ?4)",
-        [&track.title, &track.artist, &track.tags.join(","), &track.path],
+        [
+            &track.title,
+            &track.artist,
+            &track.tags.join(","),
+            &track.path.to_string_path(),
+        ],
     ).context("Failed to insert track into database")?;
     Ok(())
 }
@@ -45,11 +51,12 @@ pub fn get_tracks(db_name: &str) -> Result<Vec<track::Track>> {
     let tracks = stmt.query_map([], |row| {
         let tags_string: String = row.get(3)?;
         let tags = tags_string.split(',').map(|s| s.trim().to_string()).collect();
+        let path_string: String = row.get(4)?;
         Ok(track::Track {
             title: row.get(1)?,
             artist: row.get(2)?,
             tags,
-            path: row.get(4)?,
+            path: path_string.to_pathbuf(),
         })
     })?;
     Ok(tracks.collect::<Result<Vec<_>, _>>()?)
@@ -59,6 +66,7 @@ pub fn get_tracks(db_name: &str) -> Result<Vec<track::Track>> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn test_database_operations() -> Result<()> {
@@ -72,7 +80,7 @@ mod tests {
             title: "Test Song".to_string(),
             artist: "Test Artist".to_string(),
             tags: vec!["rock".to_string(), "indie".to_string()],
-            path: "/path/to/test/song.mp3".to_string(),
+            path: PathBuf::from("/path/to/test/song.mp3"),
         };
 
         add_track(db_name, &test_track)?;
@@ -82,9 +90,9 @@ mod tests {
         assert_eq!(tracks[0].title, "Test Song");
         assert_eq!(tracks[0].artist, "Test Artist");
         assert_eq!(tracks[0].tags, vec!["rock", "indie"]);
-        assert_eq!(tracks[0].path, "/path/to/test/song.mp3");
+        assert_eq!(tracks[0].path, PathBuf::from("/path/to/test/song.mp3"));
 
-        remove_track(db_name, &test_track.path)?;
+        remove_track(db_name, &test_track.path.to_string_path())?;
 
         let tracks_after_remove = get_tracks(db_name)?;
         assert_eq!(tracks_after_remove.len(), 0);
