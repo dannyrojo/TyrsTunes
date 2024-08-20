@@ -1,4 +1,2 @@
-mod database;
-
 fn main() {
 }
