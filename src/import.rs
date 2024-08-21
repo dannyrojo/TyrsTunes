@@ -6,12 +6,20 @@ use std::path::PathBuf;
 use crate::track;
 use crate::database;
 
+use nfd::Response;
+
+
 pub fn select_directory() -> Result<PathBuf> {
-    FileDialog::new()
-        .set_title("Select a directory with mp3 files")
-        .pick_folder()
-        .ok_or_else(|| anyhow!("No directory selected"))
+    let result = nfd::open_pick_folder(None)
+        .map_err(|e| anyhow!("Failed to open directory dialog: {}", e))?;
+
+    match result {
+        Response::Okay(directory_path) => Ok(PathBuf::from(directory_path)),
+        Response::Cancel => Err(anyhow!("No directory selected")),
+        _ => Err(anyhow!("Unexpected response")),
+    }
 }
+
 
 pub fn import_tracks_from_directory(target_db: &str, directory: &PathBuf) -> Result<()> {
     for entry in WalkDir::new(directory) {
