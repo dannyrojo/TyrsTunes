@@ -1,4 +1,6 @@
-use crate::database; 
+use anyhow::{Context, Result};
+use std::path::Path;
+use crate::database;
 use crate::track;
 
 pub enum Filter {
@@ -15,8 +17,18 @@ pub struct Stage {
     pub filter: Filter,
 }
 
-pub fn initialize_stage(db_name: &str) -> Result<Stage, Box<dyn std::error::Error>> {
-    let tracks = database::get_tracks(db_name)?;
+pub fn initialize_database(db_name: &str) -> Result<()> {
+    let db_path = Path::new(db_name);
+    if !db_path.exists() {
+        database::create_table(db_name)?;
+    }
+    Ok(())
+}
+
+pub fn initialize_stage(db_name: &str) -> Result<Stage> {
+    initialize_database(db_name)?;
+    let tracks = database::get_tracks(db_name)
+        .context("Failed to get tracks from database")?;
     
     let tags: Vec<String> = tracks
         .iter()
@@ -27,10 +39,10 @@ pub fn initialize_stage(db_name: &str) -> Result<Stage, Box<dyn std::error::Erro
 
     let stage = Stage {
         tracks,
-        visible_tracks: Vec::new(), 
-        tags,                       
-        selected_tags: Vec::new(),  
-        filter: Filter::None,       
+        visible_tracks: Vec::new(),
+        tags,
+        selected_tags: Vec::new(),
+        filter: Filter::None,
     };
 
     Ok(stage)
@@ -169,4 +181,5 @@ mod tests {
         assert!(matches!(stage.filter, Filter::Or));
         assert_eq!(stage.visible_tracks.len(), 3);
     }
+
 }
