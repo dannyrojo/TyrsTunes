@@ -3,7 +3,7 @@ use anyhow::{Result, Context};
 use crate::track;
 use crate::utils::{ToStringPath, ToPathBuf};
 
-pub fn initialize_database(db_name: &str) -> Result<()> {
+pub fn create_table(db_name: &str) -> Result<()> {
     let conn = Connection::open(db_name)
         .context("Failed to open database connection")?;
     conn.execute(
@@ -16,6 +16,16 @@ pub fn initialize_database(db_name: &str) -> Result<()> {
         )",
         [],
     ).context("Failed to create tracks table")?;
+    Ok(())
+}
+
+pub fn delete_table(db_name: &str) -> Result<()> {
+    let conn = Connection::open(db_name)
+        .context("Failed to open database connection")?;
+    conn.execute(
+        "DROP TABLE IF EXISTS tracks",
+        [],
+    ).context("Failed to delete tracks table")?;
     Ok(())
 }
 
@@ -41,6 +51,23 @@ pub fn remove_track(db_name: &str, path: &str) -> Result<()> {
         "DELETE FROM tracks WHERE path = ?1",
         [path],
     ).context("Failed to remove track from database")?;
+    Ok(())
+}
+
+// check if track exists by path, if it does, update it
+pub fn update_track(db_name: &str, track: &track::Track) -> Result<()> {
+    let conn = Connection::open(db_name)
+        .context("Failed to open database connection")?;
+    conn.execute(
+        "UPDATE tracks SET title = ?1, artist = ?2, tags = ?3, path = ?4",
+        [
+            &track.title,
+            &track.artist,
+            &track.tags.join(","),
+            &track.path.to_string_path(),
+            
+        ],
+    ).context("Failed to update track in database")?;
     Ok(())
 }
 
@@ -74,7 +101,7 @@ mod tests {
 
         let _ = fs::remove_file(db_name);
 
-        initialize_database(db_name)?;
+        create_table(db_name)?;
 
         let test_track = track::Track {
             title: "Test Song".to_string(),
