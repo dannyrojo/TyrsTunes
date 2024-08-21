@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::path::Path;
 use crate::database;
 use crate::track;
+use crate::import;
 
 pub enum Filter {
     And,
@@ -20,7 +21,7 @@ pub struct Stage {
 pub fn initialize_database(db_name: &str) -> Result<()> {
     let db_path = Path::new(db_name);
     if !db_path.exists() {
-        database::create_table(db_name)?;
+        import::import_tracks_button(db_name)?;
     }
     Ok(())
 }
@@ -32,7 +33,7 @@ pub fn initialize_stage(db_name: &str) -> Result<Stage> {
     
     let tags: Vec<String> = tracks
         .iter()
-        .flat_map(|track| track.tags.clone())
+        .flat_map(|track| track.tags.split(',').map(|tag| tag.trim_start().to_string()))
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
@@ -49,7 +50,7 @@ pub fn initialize_stage(db_name: &str) -> Result<Stage> {
 }
 
 impl Stage {
-    fn update_visible_tracks(&mut self) {
+    pub fn update_visible_tracks(&mut self) {
         self.visible_tracks.clear();
 
         if self.selected_tags.is_empty() || matches!(self.filter, Filter::None) {
@@ -58,9 +59,10 @@ impl Stage {
         }
 
         for track in &self.tracks {
+            let track_tags: Vec<&str> = track.tags.split(',').map(str::trim_start).collect();
             let matches = match self.filter {
-                Filter::And => self.selected_tags.iter().all(|tag| track.tags.contains(tag)),
-                Filter::Or => self.selected_tags.iter().any(|tag| track.tags.contains(tag)),
+                Filter::And => self.selected_tags.iter().all(|tag| track_tags.contains(&tag.as_str())),
+                Filter::Or => self.selected_tags.iter().any(|tag| track_tags.contains(&tag.as_str())),
                 Filter::None => true, 
             };
 
@@ -91,19 +93,19 @@ mod tests {
             track::Track {
                 title: "Song 1".to_string(),
                 artist: "Artist A".to_string(),
-                tags: vec!["rock".to_string(), "90s".to_string()],
+                tags: "rock,90s".to_string(),
                 path: PathBuf::from("/music/song1.mp3"),
             },
             track::Track {
                 title: "Song 2".to_string(),
                 artist: "Artist B".to_string(),
-                tags: vec!["pop".to_string(), "80s".to_string()],
+                tags: "pop,80s".to_string(),
                 path: PathBuf::from("/music/song2.mp3"),
             },
             track::Track {
                 title: "Song 3".to_string(),
                 artist: "Artist C".to_string(),
-                tags: vec!["rock".to_string(), "80s".to_string()],
+                tags: "rock,80s".to_string(),
                 path: PathBuf::from("/music/song3.mp3"),
             },
         ]

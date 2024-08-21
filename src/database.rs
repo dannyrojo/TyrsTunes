@@ -37,7 +37,7 @@ pub fn add_track(db_name: &str, track: &track::Track) -> Result<()> {
         [
             &track.title,
             &track.artist,
-            &track.tags.join(","),
+            &track.tags,
             &track.path.to_string_path(),
         ],
     ).context("Failed to insert track into database")?;
@@ -63,9 +63,8 @@ pub fn update_track(db_name: &str, track: &track::Track) -> Result<()> {
         [
             &track.title,
             &track.artist,
-            &track.tags.join(","),
+            &track.tags,
             &track.path.to_string_path(),
-            
         ],
     ).context("Failed to update track in database")?;
     Ok(())
@@ -76,13 +75,11 @@ pub fn get_tracks(db_name: &str) -> Result<Vec<track::Track>> {
         .context("Failed to open database connection")?;
     let mut stmt = conn.prepare("SELECT * FROM tracks")?;
     let tracks = stmt.query_map([], |row| {
-        let tags_string: String = row.get(3)?;
-        let tags = tags_string.split(',').map(|s| s.trim().to_string()).collect();
         let path_string: String = row.get(4)?;
         Ok(track::Track {
             title: row.get(1)?,
             artist: row.get(2)?,
-            tags,
+            tags: row.get(3)?,
             path: path_string.to_pathbuf(),
         })
     })?;
@@ -106,7 +103,7 @@ mod tests {
         let test_track = track::Track {
             title: "Test Song".to_string(),
             artist: "Test Artist".to_string(),
-            tags: vec!["rock".to_string(), "indie".to_string()],
+            tags: "rock,indie".to_string(),
             path: PathBuf::from("/path/to/test/song.mp3"),
         };
 
@@ -116,7 +113,7 @@ mod tests {
         assert_eq!(tracks.len(), 1);
         assert_eq!(tracks[0].title, "Test Song");
         assert_eq!(tracks[0].artist, "Test Artist");
-        assert_eq!(tracks[0].tags, vec!["rock", "indie"]);
+        assert_eq!(tracks[0].tags, "rock,indie");
         assert_eq!(tracks[0].path, PathBuf::from("/path/to/test/song.mp3"));
 
         remove_track(db_name, &test_track.path.to_string_path())?;
