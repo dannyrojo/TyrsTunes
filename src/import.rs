@@ -1,4 +1,4 @@
-use nfd::Response;
+use rfd::FileDialog;
 use walkdir::WalkDir;
 use id3::{Tag, TagLike};
 use anyhow::{Result, Context};
@@ -8,14 +8,10 @@ use crate::database;
 
 
 fn select_directory() -> Result<PathBuf> {
-    let result = nfd::open_pick_folder(None)
-        .context("Failed to open directory dialog")?;
-
-    match result {
-        Response::Okay(directory_path) => Ok(PathBuf::from(directory_path)),
-        Response::Cancel => Err(anyhow::Error::msg("No directory selected")),
-        _ => Err(anyhow::Error::msg("Unexpected response")),
-    }
+    match FileDialog::new().pick_folder() {
+        Some(directory_path) => Ok(directory_path),
+        None => Err(anyhow::Error::msg("No directory selected")),
+    }.context("Failed to open directory dialog")
 }
 
 fn import_tracks_from_directory(target_db: &str, directory: &PathBuf) -> Result<()> {

@@ -18,16 +18,12 @@ pub struct Stage {
     pub filter: Filter,
 }
 
-pub fn initialize_database(db_name: &str) -> Result<()> {
+pub fn initialize_stage(db_name: &str) -> Result<Stage> {
     let db_path = Path::new(db_name);
     if !db_path.exists() {
         import::import_tracks_button(db_name)?;
     }
-    Ok(())
-}
 
-pub fn initialize_stage(db_name: &str) -> Result<Stage> {
-    initialize_database(db_name)?;
     let tracks = database::get_tracks(db_name)
         .context("Failed to get tracks from database")?;
     
