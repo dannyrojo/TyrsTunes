@@ -9,7 +9,7 @@ mod stage;
 mod frame;
 mod components;
 mod playlist;
-
+mod state;
 
 fn main() {
 

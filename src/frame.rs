@@ -2,11 +2,14 @@ use eframe::egui;
 use crate::stage;
 use crate::components;
 use crate::playlist;
+use crate::state;
 
 pub struct AppWindow {
     pub stage: stage::Stage,
     pub playlist_1: playlist::Playlist,
     pub playlist_2: playlist::Playlist,
+    pub state_1: state::State,
+    pub state_2: state::State,
 }
 
 impl AppWindow {
@@ -16,8 +19,10 @@ impl AppWindow {
             .expect("Failed to initialize stage");
         
         let (playlist_1, playlist_2) = playlist::initialize_playlists();
+
+        let (state_1, state_2) = state::initialize_state();
         
-        Self { stage, playlist_1, playlist_2 } //TODO: add playback controller
+        Self { stage, playlist_1, playlist_2, state_1, state_2 } //TODO: add playback controller
     }
 }
 
@@ -61,6 +66,7 @@ impl eframe::App for AppWindow {
                         panel_width, panel_height, 
                         "Playlist 1", 
                         &mut self.playlist_1,
+                        &mut self.state_1,
                     );
 
                     components::playlist_panel
@@ -69,6 +75,7 @@ impl eframe::App for AppWindow {
                         panel_width, panel_height, 
                         "Playlist 2", 
                         &mut self.playlist_2,
+                        &mut self.state_2,
                     );
                 });
             });

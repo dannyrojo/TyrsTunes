@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::stage;
 use crate::playlist;
+use crate::state::State;
 
 pub fn playlist_panel
 (
@@ -8,6 +9,7 @@ pub fn playlist_panel
     width: f32, height: f32,
     title: &str,
     playlist: &mut playlist::Playlist,
+    state: &mut State,
 )
 {
     ui.vertical(|ui| {
@@ -21,7 +23,7 @@ pub fn playlist_panel
                 .max_width(width)
                 .auto_shrink(false)
                 .show(ui, |ui| {
-                    render_playlist(ui, playlist);
+                    render_playlist(ui, playlist, state);
                 });
         });
     });
@@ -72,15 +74,16 @@ fn render_playlist
 (
     ui: &mut egui::Ui, 
     playlist: &mut playlist::Playlist,
+    state: &mut State,
 )
 {
-    let mut track_to_move: Option<(usize, usize)> = None; 
+    let mut track_to_move: Option<(usize, usize)> = None;
 
     ui.horizontal(|ui| {
-        if ui.button("Remove Selected").clicked() && playlist.selected_track.is_some() {
-            if let Some(index) = playlist.selected_track {
+        if ui.button("Remove").clicked() && state.selected_track.is_some() {
+            if let Some(index) = state.selected_track {
                 playlist.playlist.remove(index);
-                playlist.selected_track = None;
+                state.selected_track = None;
             }
         }
     });
@@ -93,19 +96,19 @@ fn render_playlist
             if ui.button("D").clicked() && index < playlist.playlist.len() - 1 {
                 track_to_move = Some((index, index + 1));
             }
-            if ui.selectable_label(playlist.selected_track == Some(index), format!("{} - {}", track.title, track.artist)).clicked() {
-                playlist.selected_track = Some(index);
+            if ui.selectable_label(state.selected_track == Some(index), format!("{} - {}", track.title, track.artist)).clicked() {
+                state.selected_track = Some(index);
             }
         });
     }
     
     if let Some((from_index, to_index)) = track_to_move {
         playlist.playlist.swap(from_index, to_index);
-        if let Some(selected) = playlist.selected_track {
+        if let Some(selected) = state.selected_track {
             if selected == from_index {
-                playlist.selected_track = Some(to_index);
+                state.selected_track = Some(to_index);
             } else if selected == to_index {
-                playlist.selected_track = Some(from_index);
+                state.selected_track = Some(from_index);
             }
         }
     }
