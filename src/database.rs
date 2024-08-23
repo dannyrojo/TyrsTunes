@@ -86,6 +86,17 @@ pub fn get_tracks(db_name: &str) -> Result<Vec<track::Track>> {
     Ok(tracks.collect::<Result<Vec<_>, _>>()?)
 }
 
+//test function to verify track exists in database
+ pub fn verify_track(db_name: &str, track: &track::Track) -> Result<()> {
+    let conn = Connection::open(db_name)
+        .context("Failed to open database connection")?;
+    conn.execute(
+        "SELECT * FROM tracks WHERE path = ?1",
+        [track.path.to_string_path()],
+    ).context("Failed to verify track in database")?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

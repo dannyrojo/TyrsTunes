@@ -8,8 +8,11 @@ mod utils;
 mod stage;
 mod frame;
 mod components;
+mod playlist;
+
 
 fn main() {
+
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "Tyrs Tunes",

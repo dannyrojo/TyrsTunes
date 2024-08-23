@@ -1,7 +1,55 @@
 use eframe::egui;
 use crate::stage;
+use crate::playlist;
 
-pub fn render_tracks_panel(ui: &mut egui::Ui, stage: &mut stage::Stage, width: f32, height: f32) {
+pub fn render_playlist_panel_1
+(
+    ui: &mut egui::Ui, 
+    width: f32, 
+    title: &str,
+    playlist: &mut playlist::Playlist,
+)
+
+{
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.label(title);
+        ui.separator();
+        for track in &playlist.playlist {
+            ui.label(format!("{} - {}", track.title, track.artist));
+        }
+    });
+}
+
+pub fn render_playlist_panel_2
+(
+    ui: &mut egui::Ui, 
+    width: f32, 
+    title: &str,
+    playlist: &mut playlist::Playlist,
+)
+
+{
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.label(title);
+        ui.separator();
+        for track in &playlist.playlist {
+            ui.label(format!("{} - {}", track.title, track.artist));
+        }
+    });
+}
+
+pub fn render_tracks_panel
+(
+    ui: &mut egui::Ui,
+    stage: &mut stage::Stage,
+    width: f32, height: f32,
+    playlist_1: &mut playlist::Playlist,
+    playlist_2: &mut playlist::Playlist,
+)
+
+{
     ui.vertical(|ui| {
         ui.set_width(width);
         ui.label("Tracks");
@@ -10,35 +58,51 @@ pub fn render_tracks_panel(ui: &mut egui::Ui, stage: &mut stage::Stage, width: f
             .max_height(height)
             .max_width(width)
             .auto_shrink(false)
-            .scroll_bar_visibility(egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible)
             .show(ui, |ui| {
-                render_tracks_list(ui, stage);
+                render_tracks_list(ui, stage, playlist_1, playlist_2); //tracks list
             });
     });
 }
 
-fn render_tracks_list(ui: &mut egui::Ui, stage: &mut stage::Stage) {
-    stage.update_visible_tracks();
-    for track in &stage.visible_tracks {
-        ui.horizontal(|ui| {
-            if ui.button("L").clicked() {  //TODO: make handlers for L and R buttons
-            }
-            if ui.button("R").clicked() {
-            }
-            ui.label(format!("{} - {}", track.title, track.artist));
-        });
-    }
-}
+pub fn render_filter_panel
+(
+    ui: &mut egui::Ui, 
+    stage: &mut stage::Stage, 
+    width: f32, height: f32,
+) 
 
-pub fn render_filter_panel(ui: &mut egui::Ui, stage: &mut stage::Stage, width: f32, height: f32) {
+{
     ui.vertical(|ui| {
         ui.set_width(width);
         ui.label("Tags");
         ui.separator();
-        render_filter_menu(ui, stage);
+        render_filter_menu(ui, stage); //filter menu
         ui.separator();
-        render_tags_list(ui, stage);
+        render_tags_list(ui, stage); //tags list
     });
+}
+
+fn render_tracks_list
+(
+    ui: &mut egui::Ui, 
+    stage: &mut stage::Stage, 
+    playlist_1: &mut playlist::Playlist, 
+    playlist_2: &mut playlist::Playlist
+) 
+
+{
+    stage.update_visible_tracks();
+    for track in &stage.visible_tracks {
+        ui.horizontal(|ui| {
+            if ui.button("L").clicked() {
+                playlist_1.add_track_to_playlist(track.clone());
+            }
+            if ui.button("R").clicked() {
+                playlist_2.add_track_to_playlist(track.clone());
+            }
+            ui.label(format!("{} - {}", track.title, track.artist));
+        });
+    }
 }
 
 fn render_filter_menu(ui: &mut egui::Ui, stage: &mut stage::Stage) {
@@ -77,11 +141,4 @@ fn render_tags_list(ui: &mut egui::Ui, stage: &mut stage::Stage) {
         }
     }
     stage.update_selected_tags(updated_tags);
-}
-
-pub fn render_playlist_panel(ui: &mut egui::Ui, width: f32, title: &str) {
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.label(title);
-    });
 }

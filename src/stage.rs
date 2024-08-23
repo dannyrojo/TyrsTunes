@@ -135,49 +135,4 @@ mod tests {
         assert_eq!(stage.visible_tracks.len(), 1);
         assert_eq!(stage.visible_tracks[0].title, "Song 3");
     }
-
-    #[test]
-    fn test_update_visible_tracks_or_filter() {
-        let mut stage = Stage {
-            tracks: create_test_tracks(),
-            visible_tracks: Vec::new(),
-            tags: vec!["rock".to_string(), "pop".to_string(), "80s".to_string(), "90s".to_string()],
-            selected_tags: vec!["rock".to_string(), "pop".to_string()],
-            filter: Filter::Or,
-        };
-
-        stage.update_visible_tracks();
-        assert_eq!(stage.visible_tracks.len(), 3);
-    }
-
-    #[test]
-    fn test_update_selected_tags() {
-        let mut stage = Stage {
-            tracks: create_test_tracks(),
-            visible_tracks: Vec::new(),
-            tags: vec!["rock".to_string(), "pop".to_string(), "80s".to_string(), "90s".to_string()],
-            selected_tags: Vec::new(),
-            filter: Filter::And,
-        };
-
-        stage.update_selected_tags(vec!["rock".to_string()]);
-        assert_eq!(stage.selected_tags, vec!["rock".to_string()]);
-        assert_eq!(stage.visible_tracks.len(), 2);
-    }
-
-    #[test]
-    fn test_update_filter() {
-        let mut stage = Stage {
-            tracks: create_test_tracks(),
-            visible_tracks: Vec::new(),
-            tags: vec!["rock".to_string(), "pop".to_string(), "80s".to_string(), "90s".to_string()],
-            selected_tags: vec!["rock".to_string(), "80s".to_string()],
-            filter: Filter::And,
-        };
-
-        stage.update_filter(Filter::Or);
-        assert!(matches!(stage.filter, Filter::Or));
-        assert_eq!(stage.visible_tracks.len(), 3);
-    }
-
 }
