@@ -12,14 +12,6 @@ impl Playlist {
             playlist: Vec::new(),
         }
     }
-
-    pub fn move_track_in_playlist(&mut self, from_index: usize, to_index: usize) {
-        if from_index != to_index {
-            let track = self.playlist.remove(from_index);
-            let insert_at = if to_index > from_index { to_index - 1 } else { to_index };
-            self.playlist.insert(insert_at, track);
-        }
-    }
     
 }
 

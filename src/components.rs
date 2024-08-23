@@ -17,11 +17,18 @@ pub fn render_playlist_panel
         ui.separator();
         
         let mut track_to_remove: Option<usize> = None;
+        let mut track_to_move: Option<(usize, usize)> = None; // (from_index, to_index)
         
         for (index, track) in playlist.playlist.iter().enumerate() {
             ui.horizontal(|ui| {
                 if ui.button("-").clicked() {
                     track_to_remove = Some(index);
+                }
+                if ui.button("U").clicked() && index > 0 {
+                    track_to_move = Some((index, index - 1));
+                }
+                if ui.button("D").clicked() && index < playlist.playlist.len() - 1 {
+                    track_to_move = Some((index, index + 1));
                 }
                 ui.label(format!("{} - {}", track.title, track.artist));
             });
@@ -29,6 +36,11 @@ pub fn render_playlist_panel
         
         if let Some(index) = track_to_remove {
             playlist.playlist.remove(index);
+        }
+        
+        if let Some((from_index, to_index)) = track_to_move {
+            let track = playlist.playlist.remove(from_index);
+            playlist.playlist.insert(to_index, track);
         }
     });
 }
