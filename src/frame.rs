@@ -32,17 +32,21 @@ impl eframe::App for AppWindow {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
 
-                    components::render_tracks_panel(
+                    components::tracks_panel
+                    (
                         ui, 
-                        &mut self.stage, 
                         panel_width, panel_height, 
-                        &mut self.playlist_1, 
-                        &mut self.playlist_2);
-
-                    components::render_filter_panel(
-                        ui, 
                         &mut self.stage, 
-                        panel_width, panel_height);
+                        &mut self.playlist_1, 
+                        &mut self.playlist_2
+                    );
+
+                    components::filter_panel
+                    (
+                        ui, 
+                        panel_width, panel_height,
+                        &mut self.stage, 
+                    );
                 });
             });
 
@@ -51,17 +55,21 @@ impl eframe::App for AppWindow {
             .min_height(panel_height)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    components::render_playlist_panel(
+                    components::playlist_panel
+                    (
                         ui, 
-                        panel_width, 
+                        panel_width, panel_height, 
                         "Playlist 1", 
-                        &mut self.playlist_1);
+                        &mut self.playlist_1,
+                    );
 
-                    components::render_playlist_panel(
+                    components::playlist_panel
+                    (
                         ui, 
-                        panel_width, 
+                        panel_width, panel_height, 
                         "Playlist 2", 
-                        &mut self.playlist_2);
+                        &mut self.playlist_2,
+                    );
                 });
             });
     }

@@ -2,22 +2,80 @@ use eframe::egui;
 use crate::stage;
 use crate::playlist;
 
-pub fn render_playlist_panel
+pub fn playlist_panel
 (
     ui: &mut egui::Ui, 
-    width: f32, 
+    width: f32, height: f32,
     title: &str,
     playlist: &mut playlist::Playlist,
 )
-
 {
     ui.vertical(|ui| {
         ui.set_width(width);
+        ui.set_height(height);
         ui.label(title);
         ui.separator();
-        
-        let mut track_to_remove: Option<usize> = None;
-        let mut track_to_move: Option<(usize, usize)> = None; // (from_index, to_index)
+        ui.push_id(title, |ui| {
+            egui::ScrollArea::vertical()
+                .max_height(height)
+                .max_width(width)
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    render_playlist(ui, playlist);
+                });
+        });
+    });
+}
+
+pub fn tracks_panel
+(
+    ui: &mut egui::Ui,
+    width: f32, height: f32,
+    stage: &mut stage::Stage,
+    playlist_1: &mut playlist::Playlist,
+    playlist_2: &mut playlist::Playlist,
+)
+{
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.set_height(height);
+        ui.label("Tracks");
+        ui.separator();
+        egui::ScrollArea::vertical()
+            .max_height(height)
+            .max_width(width)
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                render_tracks_list(ui, stage, playlist_1, playlist_2); //tracks list
+            });
+    });
+}
+
+pub fn filter_panel
+(
+    ui: &mut egui::Ui, 
+    width: f32, height: f32,
+    stage: &mut stage::Stage, 
+) 
+{
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.label("Tags");
+        ui.separator();
+        render_filter_menu(ui, stage); //filter menu
+        ui.separator();
+        render_tags_list(ui, stage); //tags list
+    });
+}
+
+fn render_playlist
+(
+    ui: &mut egui::Ui, 
+    playlist: &mut playlist::Playlist,
+)
+{
+    let mut track_to_remove: Option<usize> = None;
+    let mut track_to_move: Option<(usize, usize)> = None; // (from_index, to_index)
         
         for (index, track) in playlist.playlist.iter().enumerate() {
             ui.horizontal(|ui| {
@@ -35,56 +93,12 @@ pub fn render_playlist_panel
         }
         
         if let Some(index) = track_to_remove {
-            playlist.playlist.remove(index);
-        }
-        
-        if let Some((from_index, to_index)) = track_to_move {
-            let track = playlist.playlist.remove(from_index);
-            playlist.playlist.insert(to_index, track);
-        }
-    });
-}
-
-pub fn render_tracks_panel
-(
-    ui: &mut egui::Ui,
-    stage: &mut stage::Stage,
-    width: f32, height: f32,
-    playlist_1: &mut playlist::Playlist,
-    playlist_2: &mut playlist::Playlist,
-)
-
-{
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.label("Tracks");
-        ui.separator();
-        egui::ScrollArea::vertical()
-            .max_height(height)
-            .max_width(width)
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                render_tracks_list(ui, stage, playlist_1, playlist_2); //tracks list
-            });
-    });
-}
-
-pub fn render_filter_panel
-(
-    ui: &mut egui::Ui, 
-    stage: &mut stage::Stage, 
-    width: f32, height: f32,
-) 
-
-{
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.label("Tags");
-        ui.separator();
-        render_filter_menu(ui, stage); //filter menu
-        ui.separator();
-        render_tags_list(ui, stage); //tags list
-    });
+        playlist.playlist.remove(index);
+    }
+    if let Some((from_index, to_index)) = track_to_move {
+        let track = playlist.playlist.remove(from_index);
+        playlist.playlist.insert(to_index, track);
+    }
 }
 
 fn render_tracks_list
@@ -94,7 +108,6 @@ fn render_tracks_list
     playlist_1: &mut playlist::Playlist, 
     playlist_2: &mut playlist::Playlist
 ) 
-
 {
     stage.update_visible_tracks();
     for track in &stage.visible_tracks {
@@ -110,7 +123,12 @@ fn render_tracks_list
     }
 }
 
-fn render_filter_menu(ui: &mut egui::Ui, stage: &mut stage::Stage) {
+fn render_filter_menu
+(
+    ui: &mut egui::Ui, 
+    stage: &mut stage::Stage
+) 
+{
     let filter_options = ["AND", "OR", "----"];
     let current_filter = match stage.filter {
         stage::Filter::And => "AND",
@@ -133,7 +151,12 @@ fn render_filter_menu(ui: &mut egui::Ui, stage: &mut stage::Stage) {
     });
 }
 
-fn render_tags_list(ui: &mut egui::Ui, stage: &mut stage::Stage) {
+fn render_tags_list
+(
+    ui: &mut egui::Ui, 
+    stage: &mut stage::Stage
+) 
+{
     let mut updated_tags = Vec::new();
     for tag in &stage.tags {
         let mut is_selected = stage.selected_tags.contains(tag);
