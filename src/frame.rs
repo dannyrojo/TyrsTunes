@@ -51,13 +51,13 @@ impl eframe::App for AppWindow {
             .min_height(panel_height)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    components::render_playlist_panel_1(
+                    components::render_playlist_panel(
                         ui, 
                         panel_width, 
                         "Playlist 1", 
                         &mut self.playlist_1);
 
-                    components::render_playlist_panel_2(
+                    components::render_playlist_panel(
                         ui, 
                         panel_width, 
                         "Playlist 2", 

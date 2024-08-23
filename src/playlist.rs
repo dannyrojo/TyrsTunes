@@ -12,12 +12,7 @@ impl Playlist {
             playlist: Vec::new(),
         }
     }
-    pub fn add_track_to_playlist(&mut self, track: Track) {
-        self.playlist.push(track);
-    }
-    pub fn remove_track_from_playlist(&mut self, index: usize) {
-        self.playlist.remove(index);
-    }
+
     pub fn move_track_in_playlist(&mut self, from_index: usize, to_index: usize) {
         if from_index != to_index {
             let track = self.playlist.remove(from_index);

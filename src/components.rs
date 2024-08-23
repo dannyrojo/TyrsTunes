@@ -2,7 +2,7 @@ use eframe::egui;
 use crate::stage;
 use crate::playlist;
 
-pub fn render_playlist_panel_1
+pub fn render_playlist_panel
 (
     ui: &mut egui::Ui, 
     width: f32, 
@@ -15,27 +15,20 @@ pub fn render_playlist_panel_1
         ui.set_width(width);
         ui.label(title);
         ui.separator();
-        for track in &playlist.playlist {
-            ui.label(format!("{} - {}", track.title, track.artist));
+        
+        let mut track_to_remove: Option<usize> = None;
+        
+        for (index, track) in playlist.playlist.iter().enumerate() {
+            ui.horizontal(|ui| {
+                if ui.button("-").clicked() {
+                    track_to_remove = Some(index);
+                }
+                ui.label(format!("{} - {}", track.title, track.artist));
+            });
         }
-    });
-}
-
-pub fn render_playlist_panel_2
-(
-    ui: &mut egui::Ui, 
-    width: f32, 
-    title: &str,
-    playlist: &mut playlist::Playlist,
-)
-
-{
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.label(title);
-        ui.separator();
-        for track in &playlist.playlist {
-            ui.label(format!("{} - {}", track.title, track.artist));
+        
+        if let Some(index) = track_to_remove {
+            playlist.playlist.remove(index);
         }
     });
 }
@@ -95,10 +88,10 @@ fn render_tracks_list
     for track in &stage.visible_tracks {
         ui.horizontal(|ui| {
             if ui.button("L").clicked() {
-                playlist_1.add_track_to_playlist(track.clone());
+                playlist_1.playlist.push(track.clone());
             }
             if ui.button("R").clicked() {
-                playlist_2.add_track_to_playlist(track.clone());
+                playlist_2.playlist.push(track.clone());
             }
             ui.label(format!("{} - {}", track.title, track.artist));
         });
