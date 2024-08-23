@@ -10,6 +10,7 @@ mod frame;
 mod components;
 mod playlist;
 mod state;
+mod playback;
 
 fn main() {
 

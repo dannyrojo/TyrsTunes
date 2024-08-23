@@ -3,6 +3,7 @@ use crate::stage;
 use crate::components;
 use crate::playlist;
 use crate::state;
+use crate::playback;
 
 pub struct AppWindow {
     pub stage: stage::Stage,
@@ -10,6 +11,8 @@ pub struct AppWindow {
     pub playlist_2: playlist::Playlist,
     pub state_1: state::State,
     pub state_2: state::State,
+    pub stream: rodio::OutputStream,
+    pub stream_handle: rodio::OutputStreamHandle,
 }
 
 impl AppWindow {
@@ -22,7 +25,9 @@ impl AppWindow {
 
         let (state_1, state_2) = state::initialize_state();
         
-        Self { stage, playlist_1, playlist_2, state_1, state_2 } //TODO: add playback controller
+        let (stream, stream_handle) = playback::initialize_audiostream();
+
+        Self { stage, playlist_1, playlist_2, state_1, state_2, stream, stream_handle } //TODO: add playback controller
     }
 }
 
@@ -67,6 +72,8 @@ impl eframe::App for AppWindow {
                         "Playlist 1", 
                         &mut self.playlist_1,
                         &mut self.state_1,
+                        &mut self.stream_handle,
+                        &mut self.stream,
                     );
 
                     components::playlist_panel
@@ -76,6 +83,8 @@ impl eframe::App for AppWindow {
                         "Playlist 2", 
                         &mut self.playlist_2,
                         &mut self.state_2,
+                        &mut self.stream_handle,
+                        &mut self.stream,
                     );
                 });
             });
