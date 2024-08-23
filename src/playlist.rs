@@ -3,6 +3,7 @@ use crate::track::Track;
 pub struct Playlist {
     pub name: String,
     pub playlist: Vec<Track>,
+    pub selected_track: Option<usize>,
 }
 
 impl Playlist {
@@ -10,6 +11,7 @@ impl Playlist {
         Self {
             name,
             playlist: Vec::new(),
+            selected_track: None,
         }
     }
 }

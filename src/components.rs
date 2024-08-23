@@ -74,30 +74,40 @@ fn render_playlist
     playlist: &mut playlist::Playlist,
 )
 {
-    let mut track_to_remove: Option<usize> = None;
-    let mut track_to_move: Option<(usize, usize)> = None; // (from_index, to_index)
-        
-        for (index, track) in playlist.playlist.iter().enumerate() {
-            ui.horizontal(|ui| {
-                if ui.button("-").clicked() {
-                    track_to_remove = Some(index);
-                }
-                if ui.button("U").clicked() && index > 0 {
-                    track_to_move = Some((index, index - 1));
-                }
-                if ui.button("D").clicked() && index < playlist.playlist.len() - 1 {
-                    track_to_move = Some((index, index + 1));
-                }
-                ui.label(format!("{} - {}", track.title, track.artist));
-            });
+    let mut track_to_move: Option<(usize, usize)> = None; 
+
+    ui.horizontal(|ui| {
+        if ui.button("Remove Selected").clicked() && playlist.selected_track.is_some() {
+            if let Some(index) = playlist.selected_track {
+                playlist.playlist.remove(index);
+                playlist.selected_track = None;
+            }
         }
-        
-        if let Some(index) = track_to_remove {
-        playlist.playlist.remove(index);
+    });
+    
+    for (index, track) in playlist.playlist.iter().enumerate() {
+        ui.horizontal(|ui| {
+            if ui.button("U").clicked() && index > 0 {
+                track_to_move = Some((index, index - 1));
+            }
+            if ui.button("D").clicked() && index < playlist.playlist.len() - 1 {
+                track_to_move = Some((index, index + 1));
+            }
+            if ui.selectable_label(playlist.selected_track == Some(index), format!("{} - {}", track.title, track.artist)).clicked() {
+                playlist.selected_track = Some(index);
+            }
+        });
     }
+    
     if let Some((from_index, to_index)) = track_to_move {
-        let track = playlist.playlist.remove(from_index);
-        playlist.playlist.insert(to_index, track);
+        playlist.playlist.swap(from_index, to_index);
+        if let Some(selected) = playlist.selected_track {
+            if selected == from_index {
+                playlist.selected_track = Some(to_index);
+            } else if selected == to_index {
+                playlist.selected_track = Some(from_index);
+            }
+        }
     }
 }
 
