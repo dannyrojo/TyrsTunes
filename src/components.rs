@@ -2,10 +2,9 @@ use eframe::egui;
 use crate::stage;
 use crate::playlist;
 use crate::state::State;
-use rodio::{Sink, Decoder, source::Source};
-use std::fs::File;
-use std::io::BufReader;
-use std::time::Duration;
+use crate::audio;
+use std::sync::mpsc;
+use crate::utils::ToStringPath;
 
 pub fn playlist_panel
 (
@@ -14,8 +13,7 @@ pub fn playlist_panel
     title: &str,
     playlist: &mut playlist::Playlist,
     state: &mut State,
-    stream_handle: &mut rodio::OutputStreamHandle,
-    stream: &mut rodio::OutputStream,
+    tx: &mpsc::Sender<audio::AudioCommand>,
 )
 {
     ui.vertical(|ui| {
@@ -29,7 +27,7 @@ pub fn playlist_panel
                 .max_width(width)
                 .auto_shrink(false)
                 .show(ui, |ui| {
-                    render_playlist(ui, playlist, state, stream_handle, stream);
+                    render_playlist(ui, playlist, state, tx); //playlist
                 });
         });
     });
@@ -81,8 +79,7 @@ fn render_playlist
     ui: &mut egui::Ui, 
     playlist: &mut playlist::Playlist,
     state: &mut State,
-    stream_handle: &mut rodio::OutputStreamHandle,
-    stream: &mut rodio::OutputStream,
+    tx: &mpsc::Sender<audio::AudioCommand>,
 )
 {
     let mut track_to_move: Option<(usize, usize)> = None;
@@ -97,11 +94,15 @@ fn render_playlist
         if ui.button("Play").clicked() && state.selected_track.is_some() {
             if let Some(index) = state.selected_track {
                 let track = &playlist.playlist[index];
-                let track_path = track.path.to_str().unwrap();  
-                let file = File::open(track_path).unwrap();
-                let source = Decoder::new(BufReader::new(file)).unwrap();
-                stream_handle.play_raw(source.convert_samples());
+                let track_path = track.path.to_string_path();
+                tx.send(audio::AudioCommand::Play(track_path));
             }
+        }
+        if ui.button("Pause").clicked() {
+            tx.send(audio::AudioCommand::Pause);
+        }
+        if ui.button("Resume").clicked() {
+            tx.send(audio::AudioCommand::Resume);
         }
     });
     

@@ -3,7 +3,8 @@ use crate::stage;
 use crate::components;
 use crate::playlist;
 use crate::state;
-use crate::playback;
+use crate::audio;
+use std::sync::mpsc;
 
 pub struct AppWindow {
     pub stage: stage::Stage,
@@ -11,12 +12,12 @@ pub struct AppWindow {
     pub playlist_2: playlist::Playlist,
     pub state_1: state::State,
     pub state_2: state::State,
-    pub stream: rodio::OutputStream,
-    pub stream_handle: rodio::OutputStreamHandle,
+    pub tx1: mpsc::Sender<audio::AudioCommand>,
+    pub tx2: mpsc::Sender<audio::AudioCommand>,
 }
 
 impl AppWindow {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, tx1: mpsc::Sender<audio::AudioCommand>, tx2: mpsc::Sender<audio::AudioCommand>) -> Self {
         
         let stage = stage::initialize_stage("tyrstunes.db")
             .expect("Failed to initialize stage");
@@ -25,9 +26,9 @@ impl AppWindow {
 
         let (state_1, state_2) = state::initialize_state();
         
-        let (stream, stream_handle) = playback::initialize_audiostream();
+        
 
-        Self { stage, playlist_1, playlist_2, state_1, state_2, stream, stream_handle } //TODO: add playback controller
+        Self { stage, playlist_1, playlist_2, state_1, state_2, tx1, tx2 }
     }
 }
 
@@ -72,8 +73,7 @@ impl eframe::App for AppWindow {
                         "Playlist 1", 
                         &mut self.playlist_1,
                         &mut self.state_1,
-                        &mut self.stream_handle,
-                        &mut self.stream,
+                        &mut self.tx1,
                     );
 
                     components::playlist_panel
@@ -83,8 +83,7 @@ impl eframe::App for AppWindow {
                         "Playlist 2", 
                         &mut self.playlist_2,
                         &mut self.state_2,
-                        &mut self.stream_handle,
-                        &mut self.stream,
+                        &mut self.tx2,
                     );
                 });
             });
