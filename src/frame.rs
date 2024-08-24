@@ -42,22 +42,39 @@ impl eframe::App for AppWindow {
             .min_height(panel_height)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-
-                    components::tracks_panel
-                    (
-                        ui, 
-                        panel_width, panel_height, 
-                        &mut self.stage, 
-                        &mut self.playlist_1, 
-                        &mut self.playlist_2
-                    );
-
-                    components::filter_panel
-                    (
-                        ui, 
-                        panel_width, panel_height,
-                        &mut self.stage, 
-                    );
+                    ui.vertical(|ui| {
+                        ui.set_width(panel_width);
+                        ui.set_height(panel_height);
+                        ui.label("Tracks");
+                        ui.separator();
+                        egui::ScrollArea::vertical()
+                            .max_height(panel_height)
+                            .max_width(panel_width)
+                            .auto_shrink(false)
+                            .show(ui, |ui| {
+                                components::render_tracks_list( //tracks list
+                                    ui, 
+                                    &mut self.stage, 
+                                    &mut self.playlist_1, 
+                                    &mut self.playlist_2
+                                );
+                            });
+                    });
+                    
+                    ui.vertical(|ui| {
+                        ui.set_width(panel_width);
+                        ui.label("Tags");
+                        ui.separator();
+                        components::render_filter_menu(
+                            ui, 
+                            &mut self.stage
+                        ); 
+                        ui.separator();
+                        components::render_tags_list(
+                            ui, 
+                            &mut self.stage
+                        ); 
+                    });
                 });
             });
 
@@ -66,25 +83,46 @@ impl eframe::App for AppWindow {
             .min_height(panel_height)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    components::playlist_panel
-                    (
-                        ui, 
-                        panel_width, panel_height, 
-                        "Playlist 1", 
-                        &mut self.playlist_1,
-                        &mut self.state_1,
-                        &mut self.tx1,
-                    );
-
-                    components::playlist_panel
-                    (
-                        ui, 
-                        panel_width, panel_height, 
-                        "Playlist 2", 
-                        &mut self.playlist_2,
-                        &mut self.state_2,
-                        &mut self.tx2,
-                    );
+                    ui.vertical(|ui| {
+                        ui.set_width(panel_width);
+                        ui.set_height(panel_height);
+                        ui.label("Playlist 1");
+                        ui.separator();
+                        ui.push_id("playlist_1", |ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height(panel_height)
+                                .max_width(panel_width)
+                                .auto_shrink(false)
+                                .show(ui, |ui| {
+                                    components::render_playlist( //playlist
+                                        ui, 
+                                        &mut self.playlist_1, 
+                                        &mut self.state_1, 
+                                        &self.tx1
+                                    ); 
+                                });
+                        });
+                    });
+                    ui.vertical(|ui| {
+                        ui.set_width(panel_width);
+                        ui.set_height(panel_height);
+                        ui.label("Playlist 2");
+                        ui.separator();
+                        ui.push_id("playlist_2", |ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height(panel_height)
+                                .max_width(panel_width)
+                                .auto_shrink(false)
+                                .show(ui, |ui| {
+                                    components::render_playlist( //playlist
+                                        ui, 
+                                        &mut self.playlist_2, 
+                                        &mut self.state_2, 
+                                        &self.tx2
+                                    ); 
+                                });
+                        });
+                    });
                 });
             });
     }

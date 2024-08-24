@@ -6,75 +6,7 @@ use crate::audio;
 use std::sync::mpsc;
 use crate::utils::ToStringPath;
 
-pub fn playlist_panel
-(
-    ui: &mut egui::Ui, 
-    width: f32, height: f32,
-    title: &str,
-    playlist: &mut playlist::Playlist,
-    state: &mut State,
-    tx: &mpsc::Sender<audio::AudioCommand>,
-)
-{
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.set_height(height);
-        ui.label(title);
-        ui.separator();
-        ui.push_id(title, |ui| {
-            egui::ScrollArea::vertical()
-                .max_height(height)
-                .max_width(width)
-                .auto_shrink(false)
-                .show(ui, |ui| {
-                    render_playlist(ui, playlist, state, tx); //playlist
-                });
-        });
-    });
-}
-
-pub fn tracks_panel
-(
-    ui: &mut egui::Ui,
-    width: f32, height: f32,
-    stage: &mut stage::Stage,
-    playlist_1: &mut playlist::Playlist,
-    playlist_2: &mut playlist::Playlist,
-)
-{
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.set_height(height);
-        ui.label("Tracks");
-        ui.separator();
-        egui::ScrollArea::vertical()
-            .max_height(height)
-            .max_width(width)
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                render_tracks_list(ui, stage, playlist_1, playlist_2); //tracks list
-            });
-    });
-}
-
-pub fn filter_panel
-(
-    ui: &mut egui::Ui, 
-    width: f32, height: f32,
-    stage: &mut stage::Stage, 
-) 
-{
-    ui.vertical(|ui| {
-        ui.set_width(width);
-        ui.label("Tags");
-        ui.separator();
-        render_filter_menu(ui, stage); //filter menu
-        ui.separator();
-        render_tags_list(ui, stage); //tags list
-    });
-}
-
-fn render_playlist
+pub fn render_playlist
 (
     ui: &mut egui::Ui, 
     playlist: &mut playlist::Playlist,
@@ -132,7 +64,7 @@ fn render_playlist
     }
 }
 
-fn render_tracks_list
+pub fn render_tracks_list
 (
     ui: &mut egui::Ui, 
     stage: &mut stage::Stage, 
@@ -154,7 +86,7 @@ fn render_tracks_list
     }
 }
 
-fn render_filter_menu
+pub fn render_filter_menu
 (
     ui: &mut egui::Ui, 
     stage: &mut stage::Stage
@@ -182,7 +114,7 @@ fn render_filter_menu
     });
 }
 
-fn render_tags_list
+pub fn render_tags_list
 (
     ui: &mut egui::Ui, 
     stage: &mut stage::Stage
